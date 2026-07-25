@@ -15,7 +15,7 @@
     showintaskbar="yes"
     singleinstance="yes"
     sysmenu="yes"
-    version="2.4"
+    version="2.5"
     windowstate="normal"
     scroll="no"
 />
@@ -214,7 +214,7 @@ select:focus, input:focus { outline: none; border-color: #58a6ff; }
                 <div class="panel-title">➕ Clone New Voice</div>
                 <div class="clone-row">
                     <label>Voice Name</label>
-                    <input type="text" id="cloneName" placeholder="e.g. erik">
+                    <input type="text" id="cloneName" placeholder="e.g. erik (ASCII chars only)">
                 </div>
                 <div class="clone-row">
                     <label>Reference Audio Path <span class="auto-detect-badge" id="autoBadge">📄 transcript auto-loaded!</span></label>
@@ -355,7 +355,7 @@ select:focus, input:focus { outline: none; border-color: #58a6ff; }
             <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="clearConsole()">Clear</button>
         </div>
         <div id="consoleOut">
-            <div class="console-line info">Welcome to S2 Voice Studio v2.4!</div>
+            <div class="console-line info">Welcome to S2 Voice Studio v2.5!</div>
         </div>
     </div>
 </div>
@@ -407,7 +407,7 @@ select:focus, input:focus { outline: none; border-color: #58a6ff; }
 
 <script language="JavaScript">
 // ═══════════════════════════════════════════════════════════════
-//  S2 Voice Studio v2.4 — Spawn visible CMD, run from project root
+//  S2 Voice Studio v2.5 — Bulletproof UTF-8 & Audio Path Fix
 // ═══════════════════════════════════════════════════════════════
 
 var fso = new ActiveXObject("Scripting.FileSystemObject");
@@ -419,6 +419,67 @@ var isRunning = false;
 var pollTimer = null;
 var currentOutputPath = "";
 
+// Helper functions to get ASCII-only paths to prevent encoding errors
+function getShortPath(p) {
+    try { return fso.GetFile(p).ShortPath; } catch(e) { return p; }
+}
+function getShortFolder(p) {
+    try { return fso.GetFolder(p).ShortPath; } catch(e) { return p; }
+}
+
+// BULLETPROOF FIX FOR NON-ASCII (å, ä, ö) FILE PATHS
+// If the path contains special characters, we copy the file to a temp directory 
+// with a 100% ASCII safe name. This prevents cmd.exe from mangling the path.
+function getSafeAudioPath(audioPath) {
+    // Check if path contains non-ASCII characters
+    if (/^[\x00-\x7F]+$/.test(audioPath)) {
+        return audioPath; // It's already safe, return as is
+    }
+    
+    // Non-ASCII detected. Try 8.3 Short Path first (doesn't require copying).
+    try {
+        var shortPath = fso.GetFile(audioPath).ShortPath;
+        if (/^[\x00-\x7F]+$/.test(shortPath)) {
+            log("Used 8.3 short path for audio: " + shortPath, "info");
+            return shortPath;
+        }
+    } catch(e) {}
+    
+    // Fallback: Copy to a temp directory with ASCII-only name
+    var tempDir = WshShell.ExpandEnvironmentStrings("%TEMP%") + "\\s2studio_temp";
+    ensureDir(tempDir);
+    var ext = fso.GetExtensionName(audioPath);
+    var safeName = "ref_" + new Date().getTime() + (ext ? "." + ext : "");
+    var safePath = tempDir + "\\" + safeName;
+    
+    try {
+        fso.CopyFile(audioPath, safePath, true);
+        log("Original audio path contained special characters. Copied to safe path: " + safePath, "info");
+        return safePath;
+    } catch(e) {
+        log("Failed to copy audio to safe path: " + e.message, "error");
+        return audioPath; // Last resort
+    }
+}
+
+function readTextFileSafe(filePath) {
+    try {
+        var stream = new ActiveXObject("ADODB.Stream");
+        stream.Type = 2; // adTypeText
+        stream.CharSet = "utf-8";
+        stream.Open();
+        stream.LoadFromFile(filePath);
+        var content = stream.ReadText();
+        stream.Close();
+        return content;
+    } catch(e) {
+        var ts = fso.OpenTextFile(filePath, 1);
+        var content = !ts.AtEndOfStream ? ts.ReadAll() : "";
+        ts.Close();
+        return content;
+    }
+}
+
 function getScriptDir() {
     var path = document.location.pathname;
     path = path.replace(/^file:\/\//i, "");
@@ -427,7 +488,6 @@ function getScriptDir() {
     return fso.GetParentFolderName(path);
 }
 
-// Derive project root from s2.exe path (parent of the build folder)
 function getProjectRoot() {
     var s2 = config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe";
     var buildDir = fso.GetParentFolderName(s2);
@@ -474,7 +534,6 @@ function loadSettings() {
             document.getElementById("cfgTokenizer").value = config.tokenizer || "G:\\AI\\s2.cpp\\models\\tokenizer.json";
             document.getElementById("cfgOutput").value = config.outputDir || "G:\\AI\\s2.cpp\\output";
             log("Settings loaded. Project root: " + getProjectRoot(), "success");
-            log("Voices dir: " + getVoicesDir(), "info");
         }
     } catch(e) {
         log("Error loading settings: " + e.message, "error");
@@ -494,10 +553,9 @@ function saveSettings() {
         ts.WriteLine(JSON.stringify(config));
         ts.Close();
         log("Settings saved!", "success");
-        log("Project root: " + getProjectRoot(), "info");
-        log("Voices dir: " + getVoicesDir(), "info");
         toggleSettings();
         scanVoices();
+        updateCommand();
     } catch(e) {
         log("Failed to save settings: " + e.message, "error");
     }
@@ -507,10 +565,6 @@ function toggleSettings() {
     var m = document.getElementById("settingsModal");
     m.className = m.className === "modal-overlay open" ? "modal-overlay" : "modal-overlay open";
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  FILE BROWSER & AUTO-TRANSCRIPT
-// ═══════════════════════════════════════════════════════════════
 
 function browseAudio() {
     var fileInput = document.createElement("input");
@@ -540,10 +594,7 @@ function autoLoadTranscript(audioPath) {
         for (var i = 0; i < transcriptFiles.length; i++) {
             var txPath = transcriptFiles[i];
             if (fso.FileExists(txPath)) {
-                var ts = fso.OpenTextFile(txPath, 1);
-                var content = "";
-                if (!ts.AtEndOfStream) content = ts.ReadAll();
-                ts.Close();
+                var content = readTextFileSafe(txPath);
                 if (txPath.indexOf(".srt") > 0 || txPath.indexOf(".lrc") > 0) {
                     content = content.replace(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->?\s*\d{2}:\d{2}:\d{2}[,.]\d{3}/g, "");
                     content = content.replace(/\[\d{2}:\d{2}\.\d{2}\]/g, "");
@@ -562,15 +613,10 @@ function autoLoadTranscript(audioPath) {
                 }
             }
         }
-        log("No transcript file found.", "warn");
     } catch(e) {
         log("Auto-load error: " + e.message, "warn");
     }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  VOICE MANAGEMENT
-// ═══════════════════════════════════════════════════════════════
 
 function scanVoices() {
     var voicesDir = getVoicesDir();
@@ -611,7 +657,7 @@ function scanVoices() {
             chip.onclick = (function(n) { return function() { selectVoice(n); }; })(name);
             presets.appendChild(chip);
         }
-        log("Found " + count + " voice(s) in " + voicesDir, "info");
+        log("Found " + count + " voice(s)", "info");
     } catch(e) {
         log("Scan error: " + e.message, "warn");
     }
@@ -633,64 +679,102 @@ function toggleClone() {
     sec.className = sec.className === "clone-section open" ? "clone-section" : "clone-section open";
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  CLONE VOICE — Spawn visible CMD window
-// ═══════════════════════════════════════════════════════════════
-
 function runClone() {
     var name = document.getElementById("cloneName").value.trim();
     var audio = document.getElementById("cloneAudio").value.trim();
     var transcriptRaw = document.getElementById("cloneTranscript").value;
-    var debugBox = document.getElementById("cloneDebug");
 
     if (!name) { log("Voice name required!", "error"); return; }
     if (!audio) { log("Audio path required!", "error"); return; }
     if (!transcriptRaw) { log("Transcript required!", "error"); return; }
     if (!fso.FileExists(audio)) { log("Audio not found: " + audio, "error"); return; }
 
-    var s2 = config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe";
-    var model = config.model || "G:\\AI\\s2.cpp\\models\\s2-pro-q8_0.gguf";
-    var tokenizer = config.tokenizer || "G:\\AI\\s2.cpp\\models\\tokenizer.json";
     var outputDir = config.outputDir || "G:\\AI\\s2.cpp\\output";
-    var projectRoot = getProjectRoot();
     var voicesDir = getVoicesDir();
 
     ensureDir(outputDir);
     ensureDir(voicesDir);
 
+    // Get short paths to eliminate UTF-8 mojibake issues on the command line
+    var s2 = getShortPath(config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe");
+    var model = getShortPath(config.model || "G:\\AI\\s2.cpp\\models\\s2-pro-q8_0.gguf");
+    var tokenizer = getShortPath(config.tokenizer || "G:\\AI\\s2.cpp\\models\\tokenizer.json");
+    
+    // BULLETPROOF AUDIO PATH: Copy to ASCII temp path if it contains å, ä, ö, etc.
+    var audioSafe = getSafeAudioPath(audio);
+    
+    var outputDirSafe = getShortFolder(outputDir);
+    var projectRootSafe = getShortFolder(getProjectRoot());
+
     if (!fso.FileExists(s2)) { log("s2.exe not found!", "error"); return; }
 
-    // Sanitize: collapse to single line, replace quotes with single quotes
     var transcript = transcriptRaw.replace(/\s+/g, " ").trim();
     transcript = transcript.replace(/"/g, "'");
+    
+    // Sanitize voice name to ASCII to prevent future command line mangling during synthesis
+    var safeName = name.replace(/[^a-zA-Z0-9_-]/g, "");
+    if (safeName !== name) {
+        log("Warning: Voice name contained special characters. Renamed to: " + safeName, "warn");
+    }
 
-    // Build command using relative path from project root
-        var cmd = 'build\\s2.exe --model "' + model + '" --tokenizer "' + tokenizer + '" --prompt-audio "' + audio + '" --prompt-text "' + transcript + '" --voice ' + name + ' --save-voice --text "Voice profile initialization complete." --output "' + outputDir + '\\' + name + '_init.wav"';
+    var cmd = '"' + s2 + '" --model "' + model + '" --tokenizer "' + tokenizer + '" --prompt-audio "' + audioSafe + '" --prompt-text "' + transcript + '" --voice "' + safeName + '" --save-voice --text "Voice profile initialization complete." --output "' + outputDirSafe + '\\' + safeName + '_init.wav"';
 
-    log("Spawning CMD window for clone...", "info");
-    log("Project root: " + projectRoot, "info");
-    debugBox.innerText = cmd;
-    // "cmd /c" closes itself automatically when the command finishes
-    var shellCmd = 'cmd /c "cd /d "' + projectRoot + '" && ' + cmd + '"';
+    log("Running voice clone...", "info");
+    document.getElementById("cloneDebug").innerText = cmd;
 
     try {
-        // windowstyle=1 = normal visible window
-        WshShell.Run(shellCmd, 1, false);
-        log("Cloning voice... window will close itself when done, then click Refresh Voices.", "success");
-
-        // Clear form
-        document.getElementById("cloneName").value = "";
-        document.getElementById("cloneAudio").value = "";
-        document.getElementById("cloneTranscript").value = "";
-        toggleClone();
+        // chcp 65001 forces the shell to parse UTF-8 text arguments (like Swedish letters in the transcript) properly
+        var shellCmd = 'cmd /c "chcp 65001 >nul && cd /d "' + projectRootSafe + '" && ' + cmd + '"';
+        var oExec = WshShell.Exec(shellCmd);
+        setBusy(true);
+        watchCloneExec(oExec, safeName, voicesDir);
     } catch(e) {
-        log("Failed to spawn CMD: " + e.message, "error");
+        log("Failed to run clone: " + e.message, "error");
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  TEXT EDITOR
-// ═══════════════════════════════════════════════════════════════
+function watchCloneExec(oExec, name, voicesDir) {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+    var attempts = 0;
+    var maxAttempts = 60 * 60 * 2; 
+
+    pollTimer = setInterval(function() {
+        attempts++;
+        if (attempts > maxAttempts) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            setBusy(false);
+            return;
+        }
+
+        if (oExec.Status !== 1) return;
+
+        clearInterval(pollTimer);
+        pollTimer = null;
+        setBusy(false);
+
+        var exitCode = -1;
+        try { exitCode = oExec.ExitCode; } catch(e) {}
+
+        log("── s2.exe clone output ──", "info");
+        drainStream(oExec.StdOut, "info");
+        drainStream(oExec.StdErr, exitCode === 0 ? "warn" : "error");
+        log("──────────────────────────", "info");
+
+        var voiceFile = voicesDir + "\\" + name + ".s2voice";
+        if (fso.FileExists(voiceFile)) {
+            log("Voice '" + name + "' saved successfully.", "success");
+            document.getElementById("cloneName").value = "";
+            document.getElementById("cloneAudio").value = "";
+            document.getElementById("cloneTranscript").value = "";
+            toggleClone();
+            scanVoices();
+        } else {
+            log("Clone finished but no voice file found. Check output.", "error");
+        }
+    }, 500);
+}
 
 function insertTag(tag) {
     var ta = document.getElementById("scriptText");
@@ -711,24 +795,9 @@ function insertTag(tag) {
     updateCommand();
 }
 
-function setText(text) {
-    document.getElementById("scriptText").value = text;
-    updateCommand();
-}
-
-function clearText() {
-    document.getElementById("scriptText").value = "";
-    updateCommand();
-}
-
-function copyText() {
-    window.clipboardData.setData("Text", document.getElementById("scriptText").value);
-    log("Copied!", "success");
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  COMMAND GENERATION & SYNTHESIS
-// ═══════════════════════════════════════════════════════════════
+function setText(text) { document.getElementById("scriptText").value = text; updateCommand(); }
+function clearText() { document.getElementById("scriptText").value = ""; updateCommand(); }
+function copyText() { window.clipboardData.setData("Text", document.getElementById("scriptText").value); log("Copied!", "success"); }
 
 function updateCommand() {
     var text = document.getElementById("scriptText").value.trim();
@@ -744,17 +813,12 @@ function updateCommand() {
     var tokenizer = config.tokenizer || "G:\\AI\\s2.cpp\\models\\tokenizer.json";
     var outputDir = config.outputDir || "G:\\AI\\s2.cpp\\output";
 
-    var cmd = '"' + s2 + '"' +
-        ' --model "' + model + '"' +
-        ' --tokenizer "' + tokenizer + '"';
+    var cmd = '"' + s2 + '" --model "' + model + '" --tokenizer "' + tokenizer + '"';
 
-    if (selectedVoice) {
-        cmd += ' --voice ' + selectedVoice;
-    }
+    if (selectedVoice) cmd += ' --voice ' + selectedVoice;
 
     if (text) {
-        var safeText = text.replace(/\s+/g, " ").trim();
-        safeText = safeText.replace(/"/g, "'");
+        var safeText = text.replace(/\s+/g, " ").trim().replace(/"/g, "'");
         cmd += ' --text "' + safeText + '"';
     }
 
@@ -772,37 +836,48 @@ function updateCommand() {
     document.getElementById("cmdPreview").innerText = cmd;
 }
 
-function copyCommand() {
-    window.clipboardData.setData("Text", document.getElementById("cmdPreview").innerText);
-    log("Copied!", "success");
-}
+function copyCommand() { window.clipboardData.setData("Text", document.getElementById("cmdPreview").innerText); log("Copied!", "success"); }
 
 function runSynthesis() {
     if (isRunning) { log("Already running!", "warn"); return; }
-
     var text = document.getElementById("scriptText").value.trim();
     if (!text) { log("Enter text to synthesize!", "error"); return; }
     if (!selectedVoice) { log("Select a voice first!", "error"); return; }
 
-    var s2 = config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe";
     var outputDir = config.outputDir || "G:\\AI\\s2.cpp\\output";
     var outFile = document.getElementById("outputFile").value.trim() || "output.wav";
-    var projectRoot = getProjectRoot();
-
-    if (!fso.FileExists(s2)) { log("s2.exe not found!", "error"); return; }
     ensureDir(outputDir);
+    var projectRootSafe = getShortFolder(getProjectRoot());
 
-    var cmd = document.getElementById("cmdPreview").innerText;
+    // Update command dynamically with short paths for execution
+    var s2Safe = getShortPath(config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe");
+    var modelSafe = getShortPath(config.model || "G:\\AI\\s2.cpp\\models\\s2-pro-q8_0.gguf");
+    var tokenizerSafe = getShortPath(config.tokenizer || "G:\\AI\\s2.cpp\\models\\tokenizer.json");
+    var outputDirSafe = getShortFolder(outputDir);
+    
+    var backend = document.getElementById("backendSelect").value;
+    var gpuLayers = document.getElementById("gpuLayers").value;
+    var codec = document.getElementById("codecMode").value;
+    var maxTokens = document.getElementById("maxTokens").value;
+    var temp = document.getElementById("temperature").value;
+
+    var runCmd = '"' + s2Safe + '" --model "' + modelSafe + '" --tokenizer "' + tokenizerSafe + '" --voice ' + selectedVoice;
+    runCmd += ' --text "' + text.replace(/\s+/g, " ").trim().replace(/"/g, "'") + '"';
+    
+    if (backend === "cuda") runCmd += ' --cuda 0';
+    else if (backend === "vulkan") runCmd += ' --vulkan 0';
+    if (gpuLayers !== "-1") runCmd += ' --gpu-layers ' + gpuLayers;
+    if (codec === "cpu") runCmd += ' --codec-cpu';
+    else if (codec === "follow") runCmd += ' --codec-follow-backend';
+    if (maxTokens && maxTokens !== "512") runCmd += ' --max-tokens ' + maxTokens;
+    if (temp && temp !== "0.8") runCmd += ' --temperature ' + temp;
+    runCmd += ' --output "' + outputDirSafe + '\\' + outFile + '"';
+
     var outputPath = outputDir + "\\" + outFile;
-
-    log("Running synthesis (window closes itself when done)...", "info");
+    log("Running synthesis...", "info");
 
     try {
-        // "cmd /c" (not /k) runs the command and the window closes itself
-        // the moment it exits — no more manual closing needed. Exec (rather
-        // than Run) hands back a live process handle so we know precisely
-        // when it's actually finished, instead of guessing from the file.
-        var shellCmd = 'cmd /c "cd /d "' + projectRoot + '" && ' + cmd + '"';
+        var shellCmd = 'cmd /c "chcp 65001 >nul && cd /d "' + projectRootSafe + '" && ' + runCmd + '"';
         var oExec = WshShell.Exec(shellCmd);
         setBusy(true);
         watchExec(oExec, outputPath);
@@ -810,11 +885,6 @@ function runSynthesis() {
         log("Failed to run synthesis: " + e.message, "error");
     }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  PROCESS WATCHER — poll the real process handle for completion,
-//  then pop up the inline player automatically.
-// ═══════════════════════════════════════════════════════════════
 
 function drainStream(streamObj, defaultType) {
     try {
@@ -835,7 +905,7 @@ function watchExec(oExec, outputPath) {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 
     var attempts = 0;
-    var maxAttempts = 60 * 60 * 2; // ~30 min at 500ms intervals
+    var maxAttempts = 60 * 60 * 2; 
 
     pollTimer = setInterval(function() {
         attempts++;
@@ -843,11 +913,10 @@ function watchExec(oExec, outputPath) {
             clearInterval(pollTimer);
             pollTimer = null;
             setBusy(false);
-            log("Gave up waiting after 30 min — the process may still be running.", "warn");
             return;
         }
 
-        if (oExec.Status !== 1) return; // 0 = still running
+        if (oExec.Status !== 1) return; 
 
         clearInterval(pollTimer);
         pollTimer = null;
@@ -856,20 +925,16 @@ function watchExec(oExec, outputPath) {
         var exitCode = -1;
         try { exitCode = oExec.ExitCode; } catch(e) {}
 
-        // Streams are only safe to drain once the process has fully exited
-        // (avoids the classic risk of ReadLine() blocking on a live pipe).
         log("── s2.exe output ──", "info");
         drainStream(oExec.StdOut, "info");
         drainStream(oExec.StdErr, exitCode === 0 ? "warn" : "error");
         log("────────────────────", "info");
 
-        if (exitCode !== 0) log("Process exited with code " + exitCode + ".", "warn");
-
         if (fso.FileExists(outputPath)) {
             log("Synthesis complete: " + outputPath, "success");
             showAudioPlayer(outputPath);
         } else {
-            log("Process finished but output file wasn't found: " + outputPath, "error");
+            log("Process finished but output file wasn't found.", "error");
         }
     }, 500);
 }
@@ -877,15 +942,11 @@ function watchExec(oExec, outputPath) {
 function showAudioPlayer(path) {
     currentOutputPath = path;
     document.getElementById("audioFileName").innerText = fso.GetFileName(path);
-
     try {
         var wmp = document.getElementById("wmp");
         wmp.settings.autoStart = false;
-        wmp.URL = path; // WMP takes a plain Windows path directly, no URI encoding needed
-    } catch(e) {
-        log("Embedded player unavailable (" + e.message + "). Use the External button instead.", "warn");
-    }
-
+        wmp.URL = path; 
+    } catch(e) {}
     document.getElementById("audioPopup").className = "audio-popup show";
 }
 
@@ -899,22 +960,15 @@ function closeAudioPopup() {
 }
 
 function playInDefaultApp() {
-    if (!currentOutputPath) { log("No audio loaded yet.", "warn"); return; }
-    try {
-        WshShell.Run('cmd /c start "" "' + currentOutputPath + '"', 0, false);
-        log("Opened in default player.", "info");
-    } catch(e) {
-        log("Failed to open externally: " + e.message, "error");
-    }
+    if (!currentOutputPath) return;
+    try { WshShell.Run('cmd /c start "" "' + currentOutputPath + '"', 0, false); } 
+    catch(e) { log("Failed to open externally.", "error"); }
 }
 
 function openAudioFolder() {
-    if (!currentOutputPath) { log("No audio loaded yet.", "warn"); return; }
-    try {
-        WshShell.Run('explorer.exe /select,"' + currentOutputPath + '"', 1, false);
-    } catch(e) {
-        log("Failed to open folder: " + e.message, "error");
-    }
+    if (!currentOutputPath) return;
+    try { WshShell.Run('explorer.exe /select,"' + currentOutputPath + '"', 1, false); } 
+    catch(e) { log("Failed to open folder.", "error"); }
 }
 
 function getUniqueFilePath(dir, filename) {
@@ -930,22 +984,15 @@ function getUniqueFilePath(dir, filename) {
 }
 
 function saveAudioToDownloads() {
-    if (!currentOutputPath) { log("No audio loaded yet.", "warn"); return; }
-    if (!fso.FileExists(currentOutputPath)) { log("Output file no longer exists.", "error"); return; }
+    if (!currentOutputPath || !fso.FileExists(currentOutputPath)) return;
     try {
         var downloads = WshShell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
         ensureDir(downloads);
         var dest = getUniqueFilePath(downloads, fso.GetFileName(currentOutputPath));
         fso.CopyFile(currentOutputPath, dest, false);
         log("Saved to " + dest, "success");
-    } catch(e) {
-        log("Failed to save to Downloads: " + e.message, "error");
-    }
+    } catch(e) { log("Failed to save to Downloads.", "error"); }
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  CONSOLE
-// ═══════════════════════════════════════════════════════════════
 
 function log(msg, type) {
     type = type || "info";
@@ -957,9 +1004,7 @@ function log(msg, type) {
     c.scrollTop = c.scrollHeight;
 }
 
-function clearConsole() {
-    document.getElementById("consoleOut").innerHTML = "";
-}
+function clearConsole() { document.getElementById("consoleOut").innerHTML = ""; }
 
 function setBusy(busy) {
     isRunning = busy;
