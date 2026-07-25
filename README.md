@@ -5,7 +5,7 @@
 
 **Now with an added simple GUI to quickly write, clone voices and more** — This is tested in windows but will likely work under linux and mac OS as well. Enjoy! 
 
-Just click the **START_GUI** HTA file (in root or from the tools folder) after downloading your prefered gguf model below and extracting it + tokenize.json in the models folder. 
+Just click the **START_GUI** HTA file (in root or "s2_voice_studio.hta" from the tools folder) after downloading your prefered gguf model below and extracting it + tokenize.json in the models folder. 
 
 > **ALPHA — EXPERIMENTAL SOFTWARE**
 > This is an early-stage, community-built inference engine. Expect rough edges, missing features, and breaking changes. Not production-ready.
