@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>S2 Voice Studio</title>
+<hta:application 
+    id="S2VoiceStudio"
+    applicationname="S2 Voice Studio"
+    border="thin"
+    borderstyle="complex"
+    caption="yes"
+    maximizebutton="yes"
+    minimizebutton="yes"
+    showintaskbar="yes"
+    singleinstance="yes"
+    sysmenu="yes"
+    version="2.4"
+    windowstate="normal"
+    scroll="no"
+/>
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: #0d1117; color: #c9d1d9; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #161b22; }
+::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+#app { display: flex; flex-direction: column; height: 100vh; }
+.header {
+    background: linear-gradient(90deg, #161b22 0%, #0d1117 100%);
+    border-bottom: 1px solid #30363d; padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.logo-icon { width: 36px; height: 36px;
+    background: linear-gradient(135deg, #58a6ff, #a371f7); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.header h1 { margin: 0; font-size: 18px; font-weight: 600;
+    background: linear-gradient(90deg, #58a6ff, #a371f7);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.header-right { display: flex; gap: 8px; }
+.main { display: flex; flex: 1; overflow: hidden; }
+.sidebar { width: 280px; background: #161b22; border-right: 1px solid #30363d;
+    display: flex; flex-direction: column; overflow: hidden; }
+.panel-title { padding: 14px 16px 8px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px; color: #8b949e;
+    border-bottom: 1px solid #21262d; }
+.voice-list { flex: 1; overflow-y: auto; padding: 8px; }
+.voice-item { padding: 10px 12px; margin-bottom: 4px; border-radius: 6px;
+    cursor: pointer; border: 1px solid transparent; transition: all 0.15s;
+    display: flex; align-items: center; gap: 10px; }
+.voice-item:hover { background: #21262d; border-color: #30363d; }
+.voice-item.active { background: rgba(88, 166, 255, 0.1); border-color: #58a6ff; }
+.voice-item .v-icon { font-size: 16px; }
+.voice-item .v-name { font-weight: 500; font-size: 13px; }
+.voice-item .v-tag { margin-left: auto; font-size: 10px; padding: 2px 6px;
+    border-radius: 10px; background: #238636; color: white; font-weight: 600; }
+.center { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px; gap: 12px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    max-height: 140px; overflow-y: auto; }
+.toolbar-label { width: 100%; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px; color: #8b949e; margin-bottom: 4px; }
+.tag-btn { padding: 5px 10px; border-radius: 14px; border: 1px solid #30363d;
+    background: #0d1117; color: #c9d1d9; font-size: 12px; cursor: pointer;
+    transition: all 0.1s; font-family: inherit; }
+.tag-btn:hover { border-color: #58a6ff; background: rgba(88,166,255,0.1); transform: translateY(-1px); }
+.tag-btn.vocal { border-color: #8957e5; color: #d2a8ff; }
+.tag-btn.vocal:hover { background: rgba(137,87,229,0.15); }
+.tag-btn.emote { border-color: #da3633; color: #ff7b72; }
+.tag-btn.emote:hover { background: rgba(218,54,51,0.15); }
+.tag-btn.delivery { border-color: #3fb950; color: #7ee787; }
+.tag-btn.delivery:hover { background: rgba(63,185,80,0.15); }
+.tag-btn.pause { border-color: #d29922; color: #e3b341; }
+.tag-btn.pause:hover { background: rgba(210,153,34,0.15); }
+.editor-wrap { flex: 1; display: flex; flex-direction: column;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
+.editor-header { padding: 10px 14px; border-bottom: 1px solid #30363d;
+    display: flex; justify-content: space-between; align-items: center; }
+.editor-header span { font-size: 12px; font-weight: 600; color: #8b949e; }
+.editor-actions { display: flex; gap: 6px; }
+#scriptText { flex: 1; width: 100%; background: #0d1117; color: #e6edf3;
+    border: none; padding: 14px; font-size: 14px; line-height: 1.6;
+    resize: none; outline: none; font-family: "Segoe UI", Consolas, monospace; }
+#scriptText::placeholder { color: #484f58; }
+.rightbar { width: 320px; background: #161b22; border-left: 1px solid #30363d;
+    display: flex; flex-direction: column; overflow: hidden; }
+.settings { padding: 12px; border-bottom: 1px solid #21262d; }
+.setting-row { display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 0; font-size: 12px; }
+.setting-row label { color: #8b949e; }
+select, input[type="text"] { background: #0d1117; border: 1px solid #30363d;
+    color: #c9d1d9; padding: 5px 8px; border-radius: 4px; font-size: 12px;
+    font-family: inherit; min-width: 120px; }
+select:focus, input:focus { outline: none; border-color: #58a6ff; }
+.cmd-box { flex: 1; display: flex; flex-direction: column; padding: 12px; overflow: hidden; }
+.cmd-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: #8b949e; margin-bottom: 6px; }
+#cmdPreview { flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    padding: 10px; font-family: Consolas, "Courier New", monospace; font-size: 11px;
+    color: #7ee787; overflow: auto; white-space: pre-wrap; word-break: break-all; line-height: 1.5; }
+.console { height: 160px; background: #010409; border-top: 1px solid #30363d;
+    display: flex; flex-direction: column; }
+.console-header { padding: 8px 12px; border-bottom: 1px solid #21262d;
+    display: flex; justify-content: space-between; align-items: center; }
+.console-header span { font-size: 11px; font-weight: 700; color: #8b949e; }
+#consoleOut { flex: 1; padding: 10px 12px; overflow: auto;
+    font-family: Consolas, monospace; font-size: 11px; line-height: 1.5; color: #e6edf3; }
+.console-line { margin-bottom: 2px; }
+.console-line.error { color: #ff7b72; }
+.console-line.success { color: #7ee787; }
+.console-line.info { color: #79c0ff; }
+.console-line.warn { color: #e3b341; }
+.btn { padding: 8px 16px; border-radius: 6px; border: 1px solid;
+    font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.btn-primary { background: linear-gradient(135deg, #238636, #2ea043);
+    border-color: #238636; color: white; }
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-secondary { background: #21262d; border-color: #30363d; color: #c9d1d9; }
+.btn-secondary:hover { background: #30363d; }
+.btn-accent { background: linear-gradient(135deg, #1f6feb, #58a6ff);
+    border-color: #1f6feb; color: white; }
+.btn-accent:hover { filter: brightness(1.1); }
+.btn-browse { background: #21262d; border-color: #8957e5; color: #d2a8ff;
+    padding: 6px 12px; font-size: 11px; }
+.btn-browse:hover { background: rgba(137,87,229,0.2); }
+.action-bar { padding: 12px; border-top: 1px solid #21262d;
+    display: flex; gap: 8px; justify-content: flex-end; }
+.clone-section { padding: 12px; border-top: 1px solid #21262d; display: none; }
+.clone-section.open { display: block; }
+.clone-row { margin-bottom: 10px; }
+.clone-row label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 3px; }
+.clone-row input, .clone-row textarea { width: 100%; padding: 6px 8px;
+    background: #0d1117; border: 1px solid #30363d; color: #c9d1d9;
+    border-radius: 4px; font-family: inherit; font-size: 12px; }
+.clone-row textarea { min-height: 60px; resize: vertical; }
+.clone-row input:focus, .clone-row textarea:focus { outline: none; border-color: #58a6ff; }
+.clone-path-row { display: flex; gap: 6px; }
+.clone-path-row input { flex: 1; }
+.auto-detect-badge { display: inline-block; font-size: 10px; padding: 2px 8px;
+    border-radius: 10px; background: #238636; color: white; font-weight: 600;
+    margin-left: 6px; opacity: 0; transition: opacity 0.3s; }
+.auto-detect-badge.show { opacity: 1; }
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+    width: 500px; max-height: 80vh; overflow: auto; padding: 20px; }
+.modal h2 { margin: 0 0 16px; font-size: 16px; }
+.modal-row { margin-bottom: 12px; }
+.modal-row label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+.modal-row input { width: 100%; padding: 8px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.presets { display: flex; gap: 6px; padding: 0 12px 8px; flex-wrap: wrap; }
+.preset-chip { padding: 4px 10px; border-radius: 12px;
+    background: #21262d; border: 1px solid #30363d;
+    font-size: 11px; cursor: pointer; color: #8b949e; }
+.preset-chip:hover { background: #30363d; color: #c9d1d9; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.status-dot.ready { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
+.status-dot.busy { background: #d29922; box-shadow: 0 0 6px #d29922; }
+.status-dot.error { background: #da3633; box-shadow: 0 0 6px #da3633; }
+.small { font-size: 11px; color: #6e7681; }
+.flex { display: flex; }
+.gap-2 { gap: 8px; }
+.debug-box { background: #0d1117; border: 1px solid #30363d; border-radius: 4px;
+    padding: 6px 10px; font-size: 10px; color: #6e7681;
+    margin-top: 8px; font-family: Consolas, monospace; white-space: pre-wrap; }
+.audio-popup { position: fixed; right: 20px; bottom: 180px; width: 340px;
+    background: #161b22; border: 1px solid #3fb950; border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 200;
+    opacity: 0; transform: translateY(20px); pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s; }
+.audio-popup.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.audio-popup-header { display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-bottom: 1px solid #21262d; font-size: 13px;
+    font-weight: 600; color: #7ee787; }
+.audio-popup-close { background: none; border: none; color: #8b949e;
+    font-size: 15px; line-height: 1; cursor: pointer; padding: 2px 4px; }
+.audio-popup-close:hover { color: #e6edf3; }
+.audio-popup-body { padding: 14px; }
+.audio-filename { font-size: 11px; color: #8b949e; margin-bottom: 8px; word-break: break-all; }
+.audio-popup object { display: block; }
+.audio-popup-actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.audio-popup-actions .btn { flex: 1; padding: 6px 6px; font-size: 11px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="app">
+    <div class="header">
+        <div class="header-left">
+            <div class="logo-icon">🔊</div>
+            <h1>S2 Voice Studio</h1>
+            <span class="small" id="statusText">Ready</span>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-secondary" onclick="toggleClone()">➕ Clone New Voice</button>
+            <button class="btn btn-secondary" onclick="toggleSettings()">⚙️ Paths</button>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="sidebar">
+            <div class="panel-title">🎙️ Saved Voices</div>
+            <div class="presets" id="voicePresets"></div>
+            <div class="voice-list" id="voiceList">
+                <div class="small" style="padding: 20px; text-align: center; color: #484f58;">
+                    No voices found yet.<br>Use "Clone New Voice" to create one.
+                </div>
+            </div>
+
+            <div class="clone-section" id="cloneSection">
+                <div class="panel-title">➕ Clone New Voice</div>
+                <div class="clone-row">
+                    <label>Voice Name</label>
+                    <input type="text" id="cloneName" placeholder="e.g. erik">
+                </div>
+                <div class="clone-row">
+                    <label>Reference Audio Path <span class="auto-detect-badge" id="autoBadge">📄 transcript auto-loaded!</span></label>
+                    <div class="clone-path-row">
+                        <input type="text" id="cloneAudio" placeholder="Click Browse to select .wav or .mp3" readonly>
+                        <button class="btn btn-browse" onclick="browseAudio()">📁 Browse</button>
+                    </div>
+                </div>
+                <div class="clone-row">
+                    <label>Transcript (exact)</label>
+                    <textarea id="cloneTranscript" placeholder="Will auto-fill if a .txt file with the same name exists next to the audio..."></textarea>
+                </div>
+                <div class="flex gap-2" style="margin-top: 10px;">
+                    <button class="btn btn-primary" onclick="runClone()" style="flex:1;">💾 Save Voice</button>
+                    <button class="btn btn-secondary" onclick="toggleClone()">Cancel</button>
+                </div>
+                <div class="debug-box" id="cloneDebug">Debug info will appear here...</div>
+            </div>
+        </div>
+
+        <div class="center">
+            <div class="toolbar">
+                <div class="toolbar-label">🎭 Emotion & Expression Tags — click to insert at cursor</div>
+                <button class="tag-btn vocal" onclick="insertTag('[chuckle]')">[chuckle]</button>
+                <button class="tag-btn vocal" onclick="insertTag('[laugh]')">[laugh]</button>
+                <button class="tag-btn vocal" onclick="insertTag('[gasp]')">[gasp]</button>
+                <button class="tag-btn vocal" onclick="insertTag('[sigh]')">[sigh]</button>
+                <button class="tag-btn vocal" onclick="insertTag('[breath]')">[breath]</button>
+                <button class="tag-btn vocal" onclick="insertTag('[clears throat]')">[clears throat]</button>
+                <button class="tag-btn vocal" onclick="insertTag('[sniffles]')">[sniffles]</button>
+                <button class="tag-btn vocal" onclick="insertTag('[yawns]')">[yawns]</button>
+                <button class="tag-btn delivery" onclick="insertTag('[whisper]')">[whisper]</button>
+                <button class="tag-btn delivery" onclick="insertTag('[shout]')">[shout]</button>
+                <button class="tag-btn delivery" onclick="insertTag('[softly]')">[softly]</button>
+                <button class="tag-btn delivery" onclick="insertTag('[firmly]')">[firmly]</button>
+                <button class="tag-btn delivery" onclick="insertTag('[under breath]')">[under breath]</button>
+                <button class="tag-btn delivery" onclick="insertTag('[mumbles]')">[mumbles]</button>
+                <button class="tag-btn delivery" onclick="insertTag('[stutters]')">[stutters]</button>
+                <button class="tag-btn emote" onclick="insertTag('[happy]')">[happy]</button>
+                <button class="tag-btn emote" onclick="insertTag('[sad]')">[sad]</button>
+                <button class="tag-btn emote" onclick="insertTag('[angry]')">[angry]</button>
+                <button class="tag-btn emote" onclick="insertTag('[nervous]')">[nervous]</button>
+                <button class="tag-btn emote" onclick="insertTag('[excited]')">[excited]</button>
+                <button class="tag-btn emote" onclick="insertTag('[scared]')">[scared]</button>
+                <button class="tag-btn emote" onclick="insertTag('[tired]')">[tired]</button>
+                <button class="tag-btn emote" onclick="insertTag('[sarcastic]')">[sarcastic]</button>
+                <button class="tag-btn emote" onclick="insertTag('[crying]')">[crying]</button>
+                <button class="tag-btn emote" onclick="insertTag('[screams]')">[screams]</button>
+                <button class="tag-btn pause" onclick="insertTag('[pause]')">[pause]</button>
+                <button class="tag-btn pause" onclick="insertTag('[dramatic pause]')">[dramatic pause]</button>
+                <button class="tag-btn pause" onclick="insertTag('[short pause]')">[short pause]</button>
+                <button class="tag-btn pause" onclick="insertTag('[long pause]')">[long pause]</button>
+                <button class="tag-btn vocal" onclick="insertTag('[sings]')">[sings]</button>
+            </div>
+
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="small">Quick phrases:</span>
+                <span class="preset-chip" onclick="setText('Hello world, this is a test of the voice synthesis system.')">Test phrase</span>
+                <span class="preset-chip" onclick="setText('The quick brown fox jumps over the lazy dog.')">Tongue twister</span>
+                <span class="preset-chip" onclick="setText('[happy] What a wonderful day! [chuckle] I can\'t believe how great this turned out.')">Happy demo</span>
+                <span class="preset-chip" onclick="setText('[whisper] Listen closely... [pause] [sigh] I have something important to tell you.')">Dramatic demo</span>
+                <span class="preset-chip" onclick="setText('[angry] That is absolutely unacceptable! [firmly] I demand an explanation right now.')">Angry demo</span>
+                <span class="preset-chip" onclick="setText('[nervous] Um... [stutters] I don\'t know if I should say this... [breath] but here goes.')">Nervous demo</span>
+            </div>
+
+            <div class="editor-wrap">
+                <div class="editor-header">
+                    <span>✏️ Script</span>
+                    <div class="editor-actions">
+                        <button class="btn btn-secondary" onclick="clearText()">Clear</button>
+                        <button class="btn btn-secondary" onclick="copyText()">Copy Text</button>
+                    </div>
+                </div>
+                <textarea id="scriptText" placeholder="Type your script here... Use emotion tags like [chuckle] or [whisper] to guide the delivery.&#10;&#10;Example: [happy] Hey there! [chuckle] It's so good to finally talk to you. [pause] [softly] I've been waiting for this moment."></textarea>
+            </div>
+        </div>
+
+        <div class="rightbar">
+            <div class="panel-title">⚡ Output Settings</div>
+            <div class="settings">
+                <div class="setting-row">
+                    <label>Backend</label>
+                    <select id="backendSelect">
+                        <option value="cpu">CPU</option>
+                        <option value="cuda" selected>CUDA (NVIDIA)</option>
+                        <option value="vulkan">Vulkan (AMD/Intel)</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label>GPU Layers</label>
+                    <select id="gpuLayers">
+                        <option value="-1">Auto (all)</option>
+                        <option value="36">36 layers</option>
+                        <option value="24">24 layers</option>
+                        <option value="18">18 layers</option>
+                        <option value="12">12 layers</option>
+                        <option value="6">6 layers</option>
+                        <option value="0">CPU only</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label>Codec</label>
+                    <select id="codecMode">
+                        <option value="auto">Auto (default)</option>
+                        <option value="follow">Follow backend</option>
+                        <option value="cpu">Force CPU</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label>Max Tokens</label>
+                    <input type="text" id="maxTokens" value="512" style="width: 80px; text-align: center;">
+                </div>
+                <div class="setting-row">
+                    <label>Temperature</label>
+                    <input type="text" id="temperature" value="0.8" style="width: 80px; text-align: center;">
+                </div>
+                <div class="setting-row">
+                    <label>Output File</label>
+                    <input type="text" id="outputFile" value="output.wav" style="width: 140px;">
+                </div>
+            </div>
+
+            <div class="cmd-box">
+                <div class="cmd-label">🖥️ Generated Command</div>
+                <div id="cmdPreview">Configure settings and type text to see command...</div>
+            </div>
+
+            <div class="action-bar">
+                <button class="btn btn-secondary" onclick="copyCommand()">📋 Copy Cmd</button>
+                <button class="btn btn-primary" onclick="runSynthesis()">▶️ Synthesize</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="console">
+        <div class="console-header">
+            <span><span class="status-dot ready" id="statusDot"></span> Console Output</span>
+            <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="clearConsole()">Clear</button>
+        </div>
+        <div id="consoleOut">
+            <div class="console-line info">Welcome to S2 Voice Studio v2.4!</div>
+        </div>
+    </div>
+</div>
+
+<div class="audio-popup" id="audioPopup">
+    <div class="audio-popup-header">
+        <span>✅ Synthesis Complete</span>
+        <button class="audio-popup-close" onclick="closeAudioPopup()">✖</button>
+    </div>
+    <div class="audio-popup-body">
+        <div class="audio-filename" id="audioFileName">output.wav</div>
+        <object id="wmp" classid="CLSID:6BF52A52-394A-11d3-B153-00C04F79FAA6" width="312" height="45" style="display:block;">
+            <param name="autoStart" value="false">
+            <param name="uiMode" value="mini">
+        </object>
+        <div class="audio-popup-actions">
+            <button class="btn btn-primary" onclick="saveAudioToDownloads()">💾 Save to Downloads</button>
+            <button class="btn btn-secondary" onclick="openAudioFolder()">📂 Folder</button>
+            <button class="btn btn-secondary" onclick="playInDefaultApp()">🔊 External</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="settingsModal">
+    <div class="modal">
+        <h2>⚙️ Path Configuration</h2>
+        <div class="modal-row">
+            <label>s2.exe path</label>
+            <input type="text" id="cfgS2" value="G:\AI\s2.cpp\build\s2.exe">
+        </div>
+        <div class="modal-row">
+            <label>Model (.gguf)</label>
+            <input type="text" id="cfgModel" value="G:\AI\s2.cpp\models\s2-pro-q8_0.gguf">
+        </div>
+        <div class="modal-row">
+            <label>Tokenizer (.json)</label>
+            <input type="text" id="cfgTokenizer" value="G:\AI\s2.cpp\models\tokenizer.json">
+        </div>
+        <div class="modal-row">
+            <label>Output Directory</label>
+            <input type="text" id="cfgOutput" value="G:\AI\s2.cpp\output">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="toggleSettings()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveSettings()">Save & Scan Voices</button>
+        </div>
+    </div>
+</div>
+
+<script language="JavaScript">
+// ═══════════════════════════════════════════════════════════════
+//  S2 Voice Studio v2.4 — Spawn visible CMD, run from project root
+// ═══════════════════════════════════════════════════════════════
+
+var fso = new ActiveXObject("Scripting.FileSystemObject");
+var WshShell = new ActiveXObject("WScript.Shell");
+var configPath = "";
+var config = {};
+var selectedVoice = "";
+var isRunning = false;
+var pollTimer = null;
+var currentOutputPath = "";
+
+function getScriptDir() {
+    var path = document.location.pathname;
+    path = path.replace(/^file:\/\//i, "");
+    path = path.replace(/\//g, "\\");
+    if (path.charAt(0) === "\\" && path.charAt(2) === ":") path = path.substring(1);
+    return fso.GetParentFolderName(path);
+}
+
+// Derive project root from s2.exe path (parent of the build folder)
+function getProjectRoot() {
+    var s2 = config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe";
+    var buildDir = fso.GetParentFolderName(s2);
+    return fso.GetParentFolderName(buildDir);
+}
+
+function getVoicesDir() {
+    return getProjectRoot() + "\\voices";
+}
+
+window.onload = function() {
+    configPath = getScriptDir() + "\\s2studio_config.json";
+    log("Script dir: " + getScriptDir(), "info");
+    loadSettings();
+    scanVoices();
+    updateCommand();
+
+    var inputs = ["scriptText", "backendSelect", "gpuLayers", "codecMode", "maxTokens", "temperature", "outputFile"];
+    for (var i = 0; i < inputs.length; i++) {
+        var el = document.getElementById(inputs[i]);
+        if (el) { el.oninput = updateCommand; el.onchange = updateCommand; }
+    }
+};
+
+function ensureDir(path) {
+    try {
+        if (!fso.FolderExists(path)) { fso.CreateFolder(path); return true; }
+        return true;
+    } catch(e) {
+        log("Failed to create dir '" + path + "': " + e.message, "error");
+        return false;
+    }
+}
+
+function loadSettings() {
+    try {
+        if (fso.FileExists(configPath)) {
+            var ts = fso.OpenTextFile(configPath, 1);
+            var json = ts.ReadAll();
+            ts.Close();
+            config = eval("(" + json + ")");
+            document.getElementById("cfgS2").value = config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe";
+            document.getElementById("cfgModel").value = config.model || "G:\\AI\\s2.cpp\\models\\s2-pro-q8_0.gguf";
+            document.getElementById("cfgTokenizer").value = config.tokenizer || "G:\\AI\\s2.cpp\\models\\tokenizer.json";
+            document.getElementById("cfgOutput").value = config.outputDir || "G:\\AI\\s2.cpp\\output";
+            log("Settings loaded. Project root: " + getProjectRoot(), "success");
+            log("Voices dir: " + getVoicesDir(), "info");
+        }
+    } catch(e) {
+        log("Error loading settings: " + e.message, "error");
+    }
+}
+
+function saveSettings() {
+    try {
+        config = {
+            s2: document.getElementById("cfgS2").value,
+            model: document.getElementById("cfgModel").value,
+            tokenizer: document.getElementById("cfgTokenizer").value,
+            outputDir: document.getElementById("cfgOutput").value
+        };
+        ensureDir(getScriptDir());
+        var ts = fso.CreateTextFile(configPath, true);
+        ts.WriteLine(JSON.stringify(config));
+        ts.Close();
+        log("Settings saved!", "success");
+        log("Project root: " + getProjectRoot(), "info");
+        log("Voices dir: " + getVoicesDir(), "info");
+        toggleSettings();
+        scanVoices();
+    } catch(e) {
+        log("Failed to save settings: " + e.message, "error");
+    }
+}
+
+function toggleSettings() {
+    var m = document.getElementById("settingsModal");
+    m.className = m.className === "modal-overlay open" ? "modal-overlay" : "modal-overlay open";
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FILE BROWSER & AUTO-TRANSCRIPT
+// ═══════════════════════════════════════════════════════════════
+
+function browseAudio() {
+    var fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".wav,.mp3,.ogg,.flac";
+    fileInput.onchange = function() {
+        if (fileInput.value) {
+            document.getElementById("cloneAudio").value = fileInput.value;
+            autoLoadTranscript(fileInput.value);
+        }
+    };
+    fileInput.click();
+}
+
+function autoLoadTranscript(audioPath) {
+    try {
+        var folderPath = fso.GetParentFolderName(audioPath);
+        var baseName = fso.GetBaseName(audioPath);
+        var transcriptFiles = [
+            folderPath + "\\" + baseName + ".txt",
+            folderPath + "\\" + baseName + ".transcript",
+            folderPath + "\\" + baseName + ".transcript.txt",
+            folderPath + "\\transcript.txt",
+            folderPath + "\\" + baseName + ".srt",
+            folderPath + "\\" + baseName + ".lrc"
+        ];
+        for (var i = 0; i < transcriptFiles.length; i++) {
+            var txPath = transcriptFiles[i];
+            if (fso.FileExists(txPath)) {
+                var ts = fso.OpenTextFile(txPath, 1);
+                var content = "";
+                if (!ts.AtEndOfStream) content = ts.ReadAll();
+                ts.Close();
+                if (txPath.indexOf(".srt") > 0 || txPath.indexOf(".lrc") > 0) {
+                    content = content.replace(/\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->?\s*\d{2}:\d{2}:\d{2}[,.]\d{3}/g, "");
+                    content = content.replace(/\[\d{2}:\d{2}\.\d{2}\]/g, "");
+                    content = content.replace(/\d+\s*\n/g, "");
+                    content = content.replace(/\n\s*\n/g, "\n");
+                }
+                content = content.replace(/^\s+|\s+$/g, "");
+                if (content) {
+                    document.getElementById("cloneTranscript").value = content;
+                    var badge = document.getElementById("autoBadge");
+                    badge.className = "auto-detect-badge show";
+                    badge.innerText = "📄 loaded from " + fso.GetFileName(txPath);
+                    log("Auto-loaded transcript: " + fso.GetFileName(txPath), "success");
+                    setTimeout(function() { badge.className = "auto-detect-badge"; }, 4000);
+                    return;
+                }
+            }
+        }
+        log("No transcript file found.", "warn");
+    } catch(e) {
+        log("Auto-load error: " + e.message, "warn");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  VOICE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+
+function scanVoices() {
+    var voicesDir = getVoicesDir();
+    var list = document.getElementById("voiceList");
+    var presets = document.getElementById("voicePresets");
+    list.innerHTML = "";
+    presets.innerHTML = "";
+    try {
+        if (!fso.FolderExists(voicesDir)) {
+            list.innerHTML = '<div class="small" style="padding:20px;text-align:center;color:#484f58;">Voices folder not found.<br>' + voicesDir + '</div>';
+            return;
+        }
+        var folder = fso.GetFolder(voicesDir);
+        var files = new Enumerator(folder.Files);
+        var count = 0;
+        var voiceNames = [];
+        for (; !files.atEnd(); files.moveNext()) {
+            if (fso.GetExtensionName(files.item().Name) === "s2voice") {
+                voiceNames.push(fso.GetBaseName(files.item().Name));
+                count++;
+            }
+        }
+        if (count === 0) {
+            list.innerHTML = '<div class="small" style="padding:20px;text-align:center;color:#484f58;">No saved voices yet.</div>';
+            return;
+        }
+        voiceNames.sort();
+        for (var i = 0; i < voiceNames.length; i++) {
+            var name = voiceNames[i];
+            var div = document.createElement("div");
+            div.className = "voice-item" + (name === selectedVoice ? " active" : "");
+            div.onclick = (function(n) { return function() { selectVoice(n); }; })(name);
+            div.innerHTML = '<span class="v-icon">🎙️</span><span class="v-name">' + name + '</span><span class="v-tag">saved</span>';
+            list.appendChild(div);
+            var chip = document.createElement("span");
+            chip.className = "preset-chip";
+            chip.innerText = name;
+            chip.onclick = (function(n) { return function() { selectVoice(n); }; })(name);
+            presets.appendChild(chip);
+        }
+        log("Found " + count + " voice(s) in " + voicesDir, "info");
+    } catch(e) {
+        log("Scan error: " + e.message, "warn");
+    }
+}
+
+function selectVoice(name) {
+    selectedVoice = name;
+    var items = document.getElementsByClassName("voice-item");
+    for (var i = 0; i < items.length; i++) {
+        items[i].className = items[i].className.replace(" active", "");
+        if (items[i].innerText.indexOf(name) >= 0) items[i].className += " active";
+    }
+    updateCommand();
+    log("Selected: " + name, "info");
+}
+
+function toggleClone() {
+    var sec = document.getElementById("cloneSection");
+    sec.className = sec.className === "clone-section open" ? "clone-section" : "clone-section open";
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CLONE VOICE — Spawn visible CMD window
+// ═══════════════════════════════════════════════════════════════
+
+function runClone() {
+    var name = document.getElementById("cloneName").value.trim();
+    var audio = document.getElementById("cloneAudio").value.trim();
+    var transcriptRaw = document.getElementById("cloneTranscript").value;
+    var debugBox = document.getElementById("cloneDebug");
+
+    if (!name) { log("Voice name required!", "error"); return; }
+    if (!audio) { log("Audio path required!", "error"); return; }
+    if (!transcriptRaw) { log("Transcript required!", "error"); return; }
+    if (!fso.FileExists(audio)) { log("Audio not found: " + audio, "error"); return; }
+
+    var s2 = config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe";
+    var model = config.model || "G:\\AI\\s2.cpp\\models\\s2-pro-q8_0.gguf";
+    var tokenizer = config.tokenizer || "G:\\AI\\s2.cpp\\models\\tokenizer.json";
+    var outputDir = config.outputDir || "G:\\AI\\s2.cpp\\output";
+    var projectRoot = getProjectRoot();
+    var voicesDir = getVoicesDir();
+
+    ensureDir(outputDir);
+    ensureDir(voicesDir);
+
+    if (!fso.FileExists(s2)) { log("s2.exe not found!", "error"); return; }
+
+    // Sanitize: collapse to single line, replace quotes with single quotes
+    var transcript = transcriptRaw.replace(/\s+/g, " ").trim();
+    transcript = transcript.replace(/"/g, "'");
+
+    // Build command using relative path from project root
+        var cmd = 'build\\s2.exe --model "' + model + '" --tokenizer "' + tokenizer + '" --prompt-audio "' + audio + '" --prompt-text "' + transcript + '" --voice ' + name + ' --save-voice --text "Voice profile initialization complete." --output "' + outputDir + '\\' + name + '_init.wav"';
+
+    log("Spawning CMD window for clone...", "info");
+    log("Project root: " + projectRoot, "info");
+    debugBox.innerText = cmd;
+    // "cmd /c" closes itself automatically when the command finishes
+    var shellCmd = 'cmd /c "cd /d "' + projectRoot + '" && ' + cmd + '"';
+
+    try {
+        // windowstyle=1 = normal visible window
+        WshShell.Run(shellCmd, 1, false);
+        log("Cloning voice... window will close itself when done, then click Refresh Voices.", "success");
+
+        // Clear form
+        document.getElementById("cloneName").value = "";
+        document.getElementById("cloneAudio").value = "";
+        document.getElementById("cloneTranscript").value = "";
+        toggleClone();
+    } catch(e) {
+        log("Failed to spawn CMD: " + e.message, "error");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TEXT EDITOR
+// ═══════════════════════════════════════════════════════════════
+
+function insertTag(tag) {
+    var ta = document.getElementById("scriptText");
+    ta.focus();
+    if (document.selection) {
+        var sel = document.selection.createRange();
+        sel.text = tag + " ";
+    } else if (ta.selectionStart !== undefined) {
+        var start = ta.selectionStart;
+        var end = ta.selectionEnd;
+        var text = ta.value;
+        ta.value = text.substring(0, start) + tag + " " + text.substring(end);
+        ta.selectionStart = ta.selectionEnd = start + tag.length + 1;
+    } else {
+        ta.value += tag + " ";
+    }
+    ta.focus();
+    updateCommand();
+}
+
+function setText(text) {
+    document.getElementById("scriptText").value = text;
+    updateCommand();
+}
+
+function clearText() {
+    document.getElementById("scriptText").value = "";
+    updateCommand();
+}
+
+function copyText() {
+    window.clipboardData.setData("Text", document.getElementById("scriptText").value);
+    log("Copied!", "success");
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  COMMAND GENERATION & SYNTHESIS
+// ═══════════════════════════════════════════════════════════════
+
+function updateCommand() {
+    var text = document.getElementById("scriptText").value.trim();
+    var backend = document.getElementById("backendSelect").value;
+    var gpuLayers = document.getElementById("gpuLayers").value;
+    var codec = document.getElementById("codecMode").value;
+    var maxTokens = document.getElementById("maxTokens").value;
+    var temp = document.getElementById("temperature").value;
+    var outFile = document.getElementById("outputFile").value;
+
+    var s2 = config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe";
+    var model = config.model || "G:\\AI\\s2.cpp\\models\\s2-pro-q8_0.gguf";
+    var tokenizer = config.tokenizer || "G:\\AI\\s2.cpp\\models\\tokenizer.json";
+    var outputDir = config.outputDir || "G:\\AI\\s2.cpp\\output";
+
+    var cmd = '"' + s2 + '"' +
+        ' --model "' + model + '"' +
+        ' --tokenizer "' + tokenizer + '"';
+
+    if (selectedVoice) {
+        cmd += ' --voice ' + selectedVoice;
+    }
+
+    if (text) {
+        var safeText = text.replace(/\s+/g, " ").trim();
+        safeText = safeText.replace(/"/g, "'");
+        cmd += ' --text "' + safeText + '"';
+    }
+
+    if (backend === "cuda") cmd += ' --cuda 0';
+    else if (backend === "vulkan") cmd += ' --vulkan 0';
+
+    if (gpuLayers !== "-1") cmd += ' --gpu-layers ' + gpuLayers;
+    if (codec === "cpu") cmd += ' --codec-cpu';
+    else if (codec === "follow") cmd += ' --codec-follow-backend';
+    if (maxTokens && maxTokens !== "512") cmd += ' --max-tokens ' + maxTokens;
+    if (temp && temp !== "0.8") cmd += ' --temperature ' + temp;
+
+    cmd += ' --output "' + outputDir + '\\' + outFile + '"';
+
+    document.getElementById("cmdPreview").innerText = cmd;
+}
+
+function copyCommand() {
+    window.clipboardData.setData("Text", document.getElementById("cmdPreview").innerText);
+    log("Copied!", "success");
+}
+
+function runSynthesis() {
+    if (isRunning) { log("Already running!", "warn"); return; }
+
+    var text = document.getElementById("scriptText").value.trim();
+    if (!text) { log("Enter text to synthesize!", "error"); return; }
+    if (!selectedVoice) { log("Select a voice first!", "error"); return; }
+
+    var s2 = config.s2 || "G:\\AI\\s2.cpp\\build\\s2.exe";
+    var outputDir = config.outputDir || "G:\\AI\\s2.cpp\\output";
+    var outFile = document.getElementById("outputFile").value.trim() || "output.wav";
+    var projectRoot = getProjectRoot();
+
+    if (!fso.FileExists(s2)) { log("s2.exe not found!", "error"); return; }
+    ensureDir(outputDir);
+
+    var cmd = document.getElementById("cmdPreview").innerText;
+    var outputPath = outputDir + "\\" + outFile;
+
+    log("Running synthesis (window closes itself when done)...", "info");
+
+    try {
+        // "cmd /c" (not /k) runs the command and the window closes itself
+        // the moment it exits — no more manual closing needed. Exec (rather
+        // than Run) hands back a live process handle so we know precisely
+        // when it's actually finished, instead of guessing from the file.
+        var shellCmd = 'cmd /c "cd /d "' + projectRoot + '" && ' + cmd + '"';
+        var oExec = WshShell.Exec(shellCmd);
+        setBusy(true);
+        watchExec(oExec, outputPath);
+    } catch(e) {
+        log("Failed to run synthesis: " + e.message, "error");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PROCESS WATCHER — poll the real process handle for completion,
+//  then pop up the inline player automatically.
+// ═══════════════════════════════════════════════════════════════
+
+function drainStream(streamObj, defaultType) {
+    try {
+        if (!streamObj || streamObj.AtEndOfStream) return;
+        var text = streamObj.ReadAll();
+        if (!text) return;
+        var lines = text.split(/\r?\n/);
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (line === "") continue;
+            var t = /error|exception|failed|traceback/i.test(line) ? "error" : defaultType;
+            log(line, t);
+        }
+    } catch(e) {}
+}
+
+function watchExec(oExec, outputPath) {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+    var attempts = 0;
+    var maxAttempts = 60 * 60 * 2; // ~30 min at 500ms intervals
+
+    pollTimer = setInterval(function() {
+        attempts++;
+        if (attempts > maxAttempts) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            setBusy(false);
+            log("Gave up waiting after 30 min — the process may still be running.", "warn");
+            return;
+        }
+
+        if (oExec.Status !== 1) return; // 0 = still running
+
+        clearInterval(pollTimer);
+        pollTimer = null;
+        setBusy(false);
+
+        var exitCode = -1;
+        try { exitCode = oExec.ExitCode; } catch(e) {}
+
+        // Streams are only safe to drain once the process has fully exited
+        // (avoids the classic risk of ReadLine() blocking on a live pipe).
+        log("── s2.exe output ──", "info");
+        drainStream(oExec.StdOut, "info");
+        drainStream(oExec.StdErr, exitCode === 0 ? "warn" : "error");
+        log("────────────────────", "info");
+
+        if (exitCode !== 0) log("Process exited with code " + exitCode + ".", "warn");
+
+        if (fso.FileExists(outputPath)) {
+            log("Synthesis complete: " + outputPath, "success");
+            showAudioPlayer(outputPath);
+        } else {
+            log("Process finished but output file wasn't found: " + outputPath, "error");
+        }
+    }, 500);
+}
+
+function showAudioPlayer(path) {
+    currentOutputPath = path;
+    document.getElementById("audioFileName").innerText = fso.GetFileName(path);
+
+    try {
+        var wmp = document.getElementById("wmp");
+        wmp.settings.autoStart = false;
+        wmp.URL = path; // WMP takes a plain Windows path directly, no URI encoding needed
+    } catch(e) {
+        log("Embedded player unavailable (" + e.message + "). Use the External button instead.", "warn");
+    }
+
+    document.getElementById("audioPopup").className = "audio-popup show";
+}
+
+function closeAudioPopup() {
+    try {
+        var wmp = document.getElementById("wmp");
+        wmp.controls.stop();
+        wmp.URL = "";
+    } catch(e) {}
+    document.getElementById("audioPopup").className = "audio-popup";
+}
+
+function playInDefaultApp() {
+    if (!currentOutputPath) { log("No audio loaded yet.", "warn"); return; }
+    try {
+        WshShell.Run('cmd /c start "" "' + currentOutputPath + '"', 0, false);
+        log("Opened in default player.", "info");
+    } catch(e) {
+        log("Failed to open externally: " + e.message, "error");
+    }
+}
+
+function openAudioFolder() {
+    if (!currentOutputPath) { log("No audio loaded yet.", "warn"); return; }
+    try {
+        WshShell.Run('explorer.exe /select,"' + currentOutputPath + '"', 1, false);
+    } catch(e) {
+        log("Failed to open folder: " + e.message, "error");
+    }
+}
+
+function getUniqueFilePath(dir, filename) {
+    var base = fso.GetBaseName(filename);
+    var ext = fso.GetExtensionName(filename);
+    var candidate = dir + "\\" + filename;
+    var n = 1;
+    while (fso.FileExists(candidate)) {
+        candidate = dir + "\\" + base + " (" + n + ")" + (ext ? "." + ext : "");
+        n++;
+    }
+    return candidate;
+}
+
+function saveAudioToDownloads() {
+    if (!currentOutputPath) { log("No audio loaded yet.", "warn"); return; }
+    if (!fso.FileExists(currentOutputPath)) { log("Output file no longer exists.", "error"); return; }
+    try {
+        var downloads = WshShell.ExpandEnvironmentStrings("%USERPROFILE%") + "\\Downloads";
+        ensureDir(downloads);
+        var dest = getUniqueFilePath(downloads, fso.GetFileName(currentOutputPath));
+        fso.CopyFile(currentOutputPath, dest, false);
+        log("Saved to " + dest, "success");
+    } catch(e) {
+        log("Failed to save to Downloads: " + e.message, "error");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONSOLE
+// ═══════════════════════════════════════════════════════════════
+
+function log(msg, type) {
+    type = type || "info";
+    var c = document.getElementById("consoleOut");
+    var line = document.createElement("div");
+    line.className = "console-line " + type;
+    line.innerText = "[" + new Date().toLocaleTimeString() + "] " + msg;
+    c.appendChild(line);
+    c.scrollTop = c.scrollHeight;
+}
+
+function clearConsole() {
+    document.getElementById("consoleOut").innerHTML = "";
+}
+
+function setBusy(busy) {
+    isRunning = busy;
+    var dot = document.getElementById("statusDot");
+    var text = document.getElementById("statusText");
+    dot.className = busy ? "status-dot busy" : "status-dot ready";
+    text.innerText = busy ? "Synthesizing..." : "Ready";
+}
+
+if (!window.JSON) window.JSON = {};
+if (!JSON.stringify) {
+    JSON.stringify = function(obj) {
+        var t = typeof obj;
+        if (t !== "object" || obj === null) {
+            if (t === "string") return '"' + obj.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+            return String(obj);
+        }
+        var n, v, json = [], arr = (obj && obj.constructor === Array);
+        for (n in obj) {
+            v = obj[n]; t = typeof v;
+            if (t === "string") v = '"' + v.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+            else if (t === "object" && v !== null) v = JSON.stringify(v);
+            json.push((arr ? "" : '"' + n + '":') + String(v));
+        }
+        return (arr ? "[" : "{") + String(json) + (arr ? "]" : "}");
+    };
+}
+</script>
+</body>
+</html>
