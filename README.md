@@ -1,4 +1,10 @@
+
+
+
 # s2.cpp
+
+**Now with an added simple GUI to quickly write, clone voices and more** — This is tested in windows but will likely work under linux and mac OS as well. Enjoy! 
+# Just click the START_GUI HTA file after downloading your prefered gguf model below.
 
 > **ALPHA — EXPERIMENTAL SOFTWARE**
 > This is an early-stage, community-built inference engine. Expect rough edges, missing features, and breaking changes. Not production-ready.
