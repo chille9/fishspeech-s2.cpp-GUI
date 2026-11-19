@@ -3,7 +3,10 @@
 
 # s2.cpp
 
-**Now with an added simple GUI to quickly write, clone voices and more** — This is tested in windows but will likely work under linux and mac OS as well. Enjoy! 
+**Now with an added GUI to quickly write, save cloned voices and more** — This is tested in windows but will likely work under linux and mac OS as well. Enjoy! 
+
+<img width="1917" height="983" alt="GUI" src="https://github.com/user-attachments/assets/9cc10f80-57d4-4c13-92b7-2dd0d3ef85e0" />
+
 
 Just click the **START_GUI** HTA file (in root or "s2_voice_studio.hta" from the tools folder) after downloading your prefered gguf model below and extracting it + tokenize.json in the models folder. 
 
